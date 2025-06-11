@@ -1,152 +1,161 @@
-# Multipass 使用指南
+# Multipass 使用手册
 
-Multipass 是一个用于快速创建 Ubuntu 虚拟机（类似 CT 容器体验）的工具，支持 macOS、Windows 和 Linux，适合开发者轻量级使用。
+Multipass 是由 Canonical 提供的轻量级 VM 管理工具，特别适合快速启动 Ubuntu 虚拟机。
 
 ---
 
-## ✅ 安装 Multipass
+## 📦 安装
 
-macOS 安装方式：
+### macOS
 
 ```bash
 brew install --cask multipass
 ```
 
-安装完成后，GUI 工具也会一并安装，可通过搜索 "Multipass" 启动图形界面。
+---
+
+## 🚀 创建与管理虚拟机
+
+### 创建虚拟机（默认 Ubuntu 22.04）
+
+```bash
+multipass launch --name devbox
+```
+
+### 指定系统版本、CPU、内存、磁盘大小
+
+```bash
+multipass launch --name devbox \
+  --cpus 2 \
+  --mem 2G \
+  --disk 10G \
+  22.04
+```
 
 ---
 
-## 🚀 快速创建虚拟机
+## 🛠 管理虚拟机
+
+### 查看虚拟机信息
 
 ```bash
-multipass launch -n devbox
+multipass info devbox
 ```
 
-默认：Ubuntu LTS、1 CPU、1G 内存、5G 磁盘
-
-自定义资源：
+### 查看所有实例
 
 ```bash
-multipass launch -n ros2 -c 4 -m 8G -d 55G
+multipass list
 ```
 
-示例参数说明：
+### 登录虚拟机
 
-* `-n`: 名称
-* `-c`: CPU 数量
-* `-m`: 内存大小（支持 MiB/GiB）
-* `-d`: 磁盘大小（支持 GiB）
+```bash
+multipass shell devbox
+```
+
+### 删除虚拟机
+
+```bash
+multipass delete devbox
+multipass purge  # 清理残留数据
+```
 
 ---
 
-## 🔍 查看可用系统版本
+## 📡 网络信息
+
+创建的虚拟机会自动分配私有 IPv4 地址：
+
+```bash
+multipass info devbox
+# IPv4: 192.168.x.x
+```
+
+你可以通过此 IP 用 SSH 工具连接，例如：
+
+```bash
+ssh ubuntu@192.168.64.11
+```
+
+---
+
+## 🔐 SSH 公钥登录支持
+
+Multipass 默认会将你主机上的 `~/.ssh/id_rsa.pub` 或 `~/.ssh/id_ed25519.pub` 自动注入虚拟机。
+
+### 手动注入本机 SSH 公钥（用于已存在的实例）
+
+```bash
+multipass exec devbox -- bash -c "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys" < ~/.ssh/id_ed25519.pub
+```
+
+---
+
+## ☁️ 使用 cloud-init 文件初始化虚拟机
+
+### 示例 `cloud-init.yaml`
+
+```yaml
+#cloud-config
+users:
+  - default
+  - name: ubuntu
+    ssh-authorized-keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGhzxRKkAyam3hMbPzKPlbpeKV04t9EbYEBMT+2++eOE panda@MacBook-Pro-2.local
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+```
+
+### 使用该配置创建虚拟机
+
+```bash
+multipass launch --name devbox --cloud-init cloud-init.yaml
+```
+
+---
+
+## 📋 查看可用的镜像版本
 
 ```bash
 multipass find
 ```
 
-列出如 `22.04`, `20.04`, `24.04` 等可用 Ubuntu 镜像。
+---
+
+## 🖥 是否有图形界面？
+
+Multipass 原生不带 GUI，但可使用以下替代方案：
+
+* [Multipass Tray](https://github.com/canonical/multipass-tray)：非官方图形界面
 
 ---
 
-## 📦 查看和管理实例
+## 📎 其他常用命令
+
+### 文件上传/下载
 
 ```bash
-multipass list       # 查看实例
-multipass info devbox  # 查看 devbox 实例详细信息
+multipass transfer ./localfile.txt devbox:/home/ubuntu/
 ```
 
----
-
-## 📁 Cloud-init 自定义配置
-
-你可以通过 `cloud-init.yaml` 配置实例初始化行为，例如创建用户、添加 SSH 密钥、安装软件：
-
-cloud-init.yaml 示例：
-
-```yaml
-#cloud-config
-users:
-  - name: panda
-    ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3N... panda@MacBook-Pro-2.local
-    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-    groups: sudo
-    shell: /bin/bash
-packages:
-  - git
-  - curl
-runcmd:
-  - echo "Hello from cloud-init" > /home/panda/welcome.txt
-```
-
-使用 cloud-init 创建实例：
+### 启动 / 停止
 
 ```bash
-multipass launch -n custombox --cloud-init cloud-init.yaml
+multipass stop devbox
+multipass start devbox
 ```
 
----
-
-## 🔑 使用公钥 SSH 登录
-
-Multipass 实例默认通过当前系统用户的公钥认证（路径通常为 `~/.ssh/id_ed25519.pub`）。
-
-你也可以手动将公钥传入 cloud-init，如上所示，或手动添加：
+### 重命名实例
 
 ```bash
-multipass transfer ~/.ssh/id_ed25519.pub devbox:
-multipass shell devbox
-mkdir -p ~/.ssh && cat id_ed25519.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+multipass alias devbox newname
 ```
 
-在 `.ssh/config` 中添加：
+---
+
+如需更多帮助，可运行：
 
 ```bash
-Host devbox
-  HostName 192.168.x.x
-  User panda
-  IdentityFile ~/.ssh/id_ed25519
+multipass --help
 ```
-
-然后即可：
-
-```bash
-ssh devbox
-```
-
----
-
-## 🖥 图形化使用 GUI
-
-Multipass 安装后默认附带图形界面，可以：
-
-* 选择镜像版本
-* 拖动设置 CPU/内存/磁盘
-* 配置桥接网络（支持访问宿主机局域网）
-
-建议勾选：`Bridged network: ON` 可直接通过 IP 访问。
-
----
-
-## ❓ 常见问题
-
-### Q1. 如何设置桥接网络以获得真实局域网 IP？
-
-A: GUI 创建时打开 `Connect to bridged network` 或使用 `--bridged en0` 参数（取决于你网卡名称）
-
-### Q2. 为何 VSCode SSH 无法连接？
-
-A: 请确保 `~/.ssh/id_ed25519.pub` 已写入目标虚拟机的 `~/.ssh/authorized_keys` 中，且权限设置正确。
-
-### Q3. 无法设置密码怎么办？
-
-A: Multipass 默认只支持 key 登录，建议通过 cloud-init 添加用户与密码或公钥。
-
----
-
-## ✅ 总结
-
-Multipass 提供了轻量、快速、近似 LXC 的虚拟机体验，适合开发调试、云端迁移、快速部署。
-
-你可以将它作为 Proxmox VE 的补充工具，用于 macOS 桌面环境下的开发测试场景。
