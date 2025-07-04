@@ -1,3 +1,11 @@
+---
+date: "2025-07-01T12:14:44+0800"
+author: panda
+categories: ["技术文档", "工具使用"]
+title: Proxmox
+lastmod: "2025-07-05T02:52:44+0000"
+---
+
 # Proxmox VE 使用指南
 
 ## 简介

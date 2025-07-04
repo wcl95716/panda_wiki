@@ -1,3 +1,11 @@
+---
+date: "2025-07-01T12:14:44+0800"
+author: panda
+categories: ["技术文档", "工具使用"]
+title: Multipass 使用文档（macOS 环境)
+lastmod: "2025-07-05T02:52:44+0000"
+---
+
 # Multipass 使用手册
 
 Multipass 是由 Canonical 提供的轻量级 VM 管理工具，特别适合快速启动 Ubuntu 虚拟机。

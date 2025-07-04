@@ -1,16 +1,16 @@
 ---
-title: 购买VPN服务器指南
-date: "2025-07-04T19:58:29+0800"
+title: By Vpn Vps
+date: "2025-07-05T02:11:03+0800"
 draft: false
 description: 推荐性价比高的VPS服务器，用于搭建个人VPN服务
 keywords: ["VPN", "VPS", "服务器", "翻墙", "代理"]
 tags: ["VPN", "VPS", "服务器", "技术"]
-categories: ["VPN搭建"]
-author: Panda
+categories: ["技术文档", "VPN技术"]
+author: panda
 showToc: true
 TocOpen: true
 weight: 1
-lastmod: "2025-07-04T23:43:04+0800"
+lastmod: "2025-07-05T02:11:03+0800"
 ---
 
 ## 概述
