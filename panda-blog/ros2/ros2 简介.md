@@ -1,9 +1,3 @@
----
-author: Panda
-categories: ["ROS2 技术文档"]
-title: Ros2
----
-
 ## ROS 2 简介
 
 ROS 2（Robot Operating System 2）是新一代的机器人操作系统，是ROS（Robot Operating System）的升级版。它为机器人开发提供了强大的工具和库，支持分布式系统、实时性、安全性和多平台（如Linux、Windows、macOS）等特性。
