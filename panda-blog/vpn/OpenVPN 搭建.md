@@ -29,19 +29,29 @@ wget https://git.io/vpn -O openvpn-install.sh && bash openvpn-install.sh
 
 ## client-to-client 配置
 
-### 1. 编辑配置文件
+### 配置作用
+`client-to-client`配置允许VPN客户端之间直接通信，实现以下功能：
+- **内网互通**：连接到同一VPN服务器的客户端可以互相访问
+- **资源共享**：便于文件共享、打印机共享等局域网功能
+- **团队协作**：支持远程办公时设备间的直接通信
+
+**注意**：此功能会增加安全风险，建议只在信任的网络环境中使用。
+
+### 配置步骤
+
+#### 1. 编辑配置文件
 打开OpenVPN服务器配置文件：
 ```bash
 sudo nano /etc/openvpn/server.conf
 ```
 
-### 2. 添加配置选项
+#### 2. 添加配置选项
 在配置文件中添加以下行：
-```
+```text
 client-to-client
 ```
 
-### 3. 重启服务
+#### 3. 重启服务
 ```bash
 sudo service openvpn restart
 ```
