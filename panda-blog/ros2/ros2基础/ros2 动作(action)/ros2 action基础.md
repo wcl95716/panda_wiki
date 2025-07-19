@@ -48,6 +48,96 @@ ROS2动作（Action）是ROS2中节点间通信的第三种方式，专门用于
 - 可以中途取消任务
 - 获得详细的执行状态信息
 
+## Action vs 传统异步任务模式
+
+### 传统异步任务模式
+```text
+1. 客户端发送请求 → 服务端
+2. 服务端返回任务ID → 客户端
+3. 客户端定期查询任务ID状态 → 服务端
+4. 服务端返回任务状态和进度 → 客户端
+5. 任务完成后，客户端获取最终结果 → 服务端
+```
+
+### ROS2 Action 模式
+```text
+1. 客户端发送目标(Goal) → 服务端
+2. 服务端返回 Goal ID → 客户端
+3. 服务端主动推送状态和进度 → 客户端
+4. 客户端接收实时反馈 → 服务端
+5. 任务完成后，服务端推送最终结果 → 客户端
+```
+
+### 关键差异
+
+| 特性 | 传统轮询模式 | ROS2 Action 模式 |
+|------|-------------|------------------|
+| **查询方式** | 客户端主动轮询 | 服务端主动推送 |
+| **实时性** | 取决于轮询频率 | 立即推送 |
+| **网络效率** | 大量无效请求 | 按需推送 |
+| **取消支持** | 需要额外接口 | 内置支持 |
+| **多客户端** | 需要额外管理 | 自动管理 |
+| **状态管理** | 客户端负责 | 服务端负责 |
+| **错误处理** | 需要额外处理 | 内置处理 |
+
+### 代码对比
+
+#### 传统异步任务模式
+```python
+# 1. 发送任务请求
+response = requests.post('/api/tasks', json={'target': 'navigate_to_10_20'})
+task_id = response.json()['task_id']
+
+# 2. 轮询任务状态
+while True:
+    status_response = requests.get(f'/api/tasks/{task_id}')
+    status = status_response.json()
+    
+    if status['state'] == 'completed':
+        result = status['result']
+        break
+    elif status['state'] == 'failed':
+        error = status['error']
+        break
+    
+    time.sleep(1)  # 等待1秒后再次查询
+```
+
+#### ROS2 Action 模式
+```python
+# 1. 发送目标
+goal_msg = Navigation.Goal()
+goal_msg.target_x = 10
+goal_msg.target_y = 20
+
+# 2. 设置回调，自动接收状态更新
+self._send_goal_future = self._action_client.send_goal_async(
+    goal_msg, feedback_callback=self.feedback_callback
+)
+
+# 3. 回调函数自动处理状态更新
+def feedback_callback(self, feedback_msg):
+    # 自动接收进度反馈，无需轮询
+    progress = feedback_msg.feedback.progress
+    print(f"导航进度: {progress}%")
+```
+
+### 优势总结
+
+Action 本质上就是一个**智能化的异步任务系统**：
+
+1. **请求阶段**：客户端发送目标，获得 Goal ID
+2. **监控阶段**：服务端主动推送状态和进度（而不是客户端轮询）
+3. **完成阶段**：服务端推送最终结果
+
+**Action 的优势**：
+- **更高效**：避免无效的轮询请求
+- **更实时**：状态变化立即推送
+- **更智能**：内置取消、错误处理等机制
+- **更简单**：客户端不需要管理轮询逻辑
+
+所以 Action 可以看作是传统异步任务模式的**升级版**，提供了更好的用户体验和系统效率。
+
 ## Action 的组成部分
 
 ### 1. 目标（Goal）
@@ -699,6 +789,14 @@ Action 是 ROS2 中处理长时间任务的最佳选择，具有以下优势：
 - 多个客户端可以同时使用同一个 Action 服务，系统自动管理各自的请求
 - Action 有 6 个状态：ACCEPTED、EXECUTING、CANCELING、CANCELED、SUCCEEDED、ABORTED
 - 支持目标拒绝、错误处理、超时处理等高级功能
+
+### 与传统异步任务模式的对比
+
+- **查询方式**：Action 是服务端主动推送，传统模式是客户端轮询
+- **实时性**：Action 立即推送，传统模式取决于轮询频率
+- **网络效率**：Action 按需推送，传统模式有大量无效请求
+- **功能完整性**：Action 内置取消、错误处理，传统模式需要额外实现
+- **开发复杂度**：Action 更简单，传统模式需要管理轮询逻辑
 
 ### 适用场景
 
