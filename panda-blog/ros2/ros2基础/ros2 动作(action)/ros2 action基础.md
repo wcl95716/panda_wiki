@@ -77,6 +77,9 @@ ROS2动作（Action）是ROS2中节点间通信的第三种方式，专门用于
 ### 4. 取消（Cancel）
 客户端可以发送取消请求来停止动作执行。
 
+### 5. 状态（Status）
+服务端发送的动作执行状态信息，包括当前状态和进度。
+
 ## Action 执行过程详解
 
 ### 核心概念
@@ -295,6 +298,24 @@ def cancel_specific_goal(self):
 服务端返回结果
 ```
 
+### Action 状态详解
+
+Action 有 6 个主要状态：
+
+1. **ACCEPTED**：目标被服务端接受，准备开始执行
+2. **EXECUTING**：动作正在执行中，服务端发送反馈
+3. **CANCELING**：动作正在被取消（如果客户端发送取消请求）
+4. **CANCELED**：动作已被取消
+5. **SUCCEEDED**：动作执行成功，返回结果
+6. **ABORTED**：动作执行失败
+
+**状态转换示例**：
+```text
+正常完成：ACCEPTED → EXECUTING → SUCCEEDED
+被取消：  ACCEPTED → EXECUTING → CANCELING → CANCELED
+执行失败：ACCEPTED → EXECUTING → ABORTED
+```
+
 ## 代码实现
 
 ### 动作服务端
@@ -454,7 +475,9 @@ python3 action_client.py
 收到结果: [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
 ```
 
-## 取消机制
+## 高级功能
+
+### 取消机制
 
 客户端可以随时取消正在执行的动作：
 
@@ -474,6 +497,60 @@ def execute_callback(self, goal_handle):
             self.get_logger().info(f'Goal ID {goal_id} 已被取消')
             return
         # 继续执行任务
+```
+
+### 目标拒绝机制
+
+服务端可以拒绝客户端的目标请求：
+
+```python
+def execute_callback(self, goal_handle):
+    # 检查目标是否合理
+    if goal_handle.request.order > 100:
+        goal_handle.abort()  # 拒绝目标
+        return Fibonacci.Result()
+    
+    # 正常处理目标
+    # ...
+```
+
+### 错误处理
+
+服务端可以处理执行过程中的错误：
+
+```python
+def execute_callback(self, goal_handle):
+    try:
+        # 执行任务
+        result = self.perform_task(goal_handle.request)
+        goal_handle.succeed()
+        return result
+    except Exception as e:
+        # 处理错误
+        goal_handle.abort()
+        self.get_logger().error(f'任务执行失败: {e}')
+        return Fibonacci.Result()
+```
+
+### 超时处理
+
+客户端可以设置超时时间：
+
+```python
+# 客户端设置超时
+def send_goal_with_timeout(self):
+    goal_msg = Fibonacci.Goal()
+    goal_msg.order = 10
+    
+    # 发送目标并设置超时
+    self._send_goal_future = self._action_client.send_goal_async(
+        goal_msg, feedback_callback=self.feedback_callback
+    )
+    
+    # 等待目标响应，超时时间 5 秒
+    if not self._send_goal_future.done():
+        self.get_logger().warn('目标发送超时')
+        return
 ```
 
 ### 多客户端取消场景
@@ -496,6 +573,113 @@ client_b.cancel_goal()  # 取消 Goal ID: "goal_002"
 # - goal_handle_003 继续正常执行
 ```
 
+## 实际应用场景
+
+### 机器人导航
+```python
+# 导航 Action 示例
+class NavigationAction:
+    def __init__(self):
+        self._action_server = ActionServer(
+            self, Navigation, 'navigation', self.navigate_callback
+        )
+    
+    def navigate_callback(self, goal_handle):
+        target_x = goal_handle.request.target_x
+        target_y = goal_handle.request.target_y
+        
+        # 开始导航
+        while not self.reached_target():
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return Navigation.Result()
+            
+            # 发送导航反馈
+            feedback = Navigation.Feedback()
+            feedback.current_x = self.current_x
+            feedback.current_y = self.current_y
+            feedback.distance_to_goal = self.calculate_distance()
+            goal_handle.publish_feedback(feedback)
+            
+            # 执行导航步骤
+            self.move_towards_target()
+        
+        # 导航完成
+        result = Navigation.Result()
+        result.final_x = self.current_x
+        result.final_y = self.current_y
+        goal_handle.succeed()
+        return result
+```
+
+### 机械臂控制
+```python
+# 机械臂 Action 示例
+class ArmAction:
+    def __init__(self):
+        self._action_server = ActionServer(
+            self, ArmControl, 'arm_control', self.arm_callback
+        )
+    
+    def arm_callback(self, goal_handle):
+        target_position = goal_handle.request.target_position
+        
+        # 控制机械臂移动
+        for step in self.plan_movement(target_position):
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return ArmControl.Result()
+            
+            # 发送关节状态反馈
+            feedback = ArmControl.Feedback()
+            feedback.joint_angles = self.get_joint_angles()
+            feedback.movement_progress = step.progress
+            goal_handle.publish_feedback(feedback)
+            
+            # 执行移动步骤
+            self.execute_movement_step(step)
+        
+        # 移动完成
+        result = ArmControl.Result()
+        result.final_position = self.get_current_position()
+        goal_handle.succeed()
+        return result
+```
+
+### 图像处理
+```python
+# 图像处理 Action 示例
+class ImageProcessingAction:
+    def __init__(self):
+        self._action_server = ActionServer(
+            self, ImageProcess, 'image_process', self.process_callback
+        )
+    
+    def process_callback(self, goal_handle):
+        image = goal_handle.request.image
+        
+        # 分步骤处理图像
+        for step in self.image_processing_pipeline():
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                return ImageProcess.Result()
+            
+            # 发送处理进度反馈
+            feedback = ImageProcess.Feedback()
+            feedback.processing_step = step.name
+            feedback.progress_percentage = step.progress
+            goal_handle.publish_feedback(feedback)
+            
+            # 执行处理步骤
+            image = step.process(image)
+        
+        # 处理完成
+        result = ImageProcess.Result()
+        result.processed_image = image
+        goal_handle.succeed()
+        return result
+```
+
 ## 总结
 
 Action 是 ROS2 中处理长时间任务的最佳选择，具有以下优势：
@@ -513,5 +697,17 @@ Action 是 ROS2 中处理长时间任务的最佳选择，具有以下优势：
 - 客户端通过回调函数链处理反馈和结果
 - 服务端通过 goal_handle 发送反馈和返回结果
 - 多个客户端可以同时使用同一个 Action 服务，系统自动管理各自的请求
+- Action 有 6 个状态：ACCEPTED、EXECUTING、CANCELING、CANCELED、SUCCEEDED、ABORTED
+- 支持目标拒绝、错误处理、超时处理等高级功能
 
-Action 特别适合机器人导航、路径规划、机械臂控制等需要长时间执行且需要监控进度的任务。
+### 适用场景
+
+Action 特别适合以下场景：
+- **机器人导航**：需要实时反馈位置和进度
+- **机械臂控制**：需要监控关节状态和运动进度
+- **图像处理**：需要了解处理进度和中间结果
+- **路径规划**：需要了解规划进度和优化状态
+- **语音识别**：需要实时显示识别进度
+- **机器学习训练**：需要监控训练进度和损失值
+- **文件传输**：需要显示传输进度和速度
+- **数据备份**：需要显示备份进度和剩余时间
